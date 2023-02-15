@@ -1,0 +1,15 @@
+.download-extension-container {
+    position: fixed;
+	bottom: 30px;
+	left: 0;
+	z-index: 999999;
+}
+
+.download-extension-content {
+    position: absolute;
+    padding: 20px;
+    background-color: white;
+    border-radius: 12px;
+    left: 100%;
+    bottom: 0;
+}

@@ -1,0 +1,27 @@
+{
+    "name": "UmengDown",
+    "description": "Download data within xls",
+    "manifest_version": 3,
+    "version": "1.0",
+    "icons": {
+        "128": "iai.png"
+    },
+    "host_permissions": [
+        "https://web.umeng.com/*"
+    ],
+    "action": {
+        "default_popup": "index.html"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://web.umeng.com/*"
+            ],
+            "js": [
+                "content_script.js",
+                "xlsx.full.min.js"
+            ],
+            "css": ["content_script.css"]
+        }
+    ]
+}
