@@ -1,30 +1,42 @@
 console.log('content_script running');
 
-function handleDownloadXls(pages) {
-    const downloadBtn = document.getElementById('down_report');
-    if (downloadBtn) {
-        console.log('fetching')
-        const fetchUrl = downloadBtn.getAttribute('url') + downloadBtn.getAttribute('searchcondition') + '&downloadType=xls';
-        fetch(fetchUrl, {method: 'GET'})
-            // 转码有问题，猜测response使用gbk编码，浏览器的js使用utf-8解码
-            // 如下是两种解码（gbk -> utf-8）方式，但是结果只能拿到string结果，后续导出为xlsx不知道怎么解了
-            // 一
-            // .then((res) => res.arrayBuffer())
-            // .then((res) => console.log(new TextDecoder('gbk').decode(res)))
-            // 二
-            // .then((res) => res.blob()).then((res) => {
-            //     const reader = new FileReader();
-            //     reader.onload = (res) => {console.log(reader.result)}
-            //     reader.readAsText(res, 'gbk');
-            // })
-            .then(async (response) => {
-                // XLSX 内置的codepage参数 未生效（设置了没有拿到正确效果）
-                const ab = await response.arrayBuffer();
-                const wb = XLSX.read(ab, {type: 'array', codepage: 936});
-                console.log(wb)
-                XLSX.writeFile(wb, "Empoyees.xlsx");
-            })
+async function handleDownloadXls(pages = 1, size = 30) {
+    const maxPage = 10;
+    const maxSize = 90;
+    let totalPages = pages > maxPage ? maxPage : pages;
+    let loadSize = size > maxSize ? maxSize : size;
+
+    const requests = [];
+    for (let i = 1; i <= totalPages; i++) {
+        requests.push(fetchList(i, loadSize))
     }
+
+    const list = await Promise.all(requests).then((datas) => {
+        return datas.flat(1);
+    });
+
+    var wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(list);
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
+    XLSX.writeFile(wb, `表格_${new Date().valueOf()}.xlsx`);
+}
+
+const fetchList = async (page, size, date) => {
+    let dateString = date;
+    if (!dateString) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const dateDay = now.getDate();
+        dateString = `${year}-${month > 9 ? month : '0' + month}-${dateDay > 9 ? dateDay : '0' + dateDay}`
+    }
+    const fetchUrl = `/main.php?c=eanalysis&a=edetail&ajax=module%3DgetList_currentPage%3D${page}_pageType%3D${size}&siteid=1281203450&st=${dateString}&et=${dateString}&visitorType=&location=&ip=&referer=&cnzz_eid=&eventname=`;
+    const list = await fetch(fetchUrl, {method: 'GET'})
+        .then(async (response) => {
+            const {data} = await response.json();
+            return data.getList.items;
+        })
+    return list;
 }
 
 const extensionContainer = document.createElement('div');
@@ -52,11 +64,8 @@ renderContent.insertAdjacentHTML('afterbegin', `
 function handleExtensionDownload(event) {
     event.preventDefault();
     const input = document.getElementById('extensionInput');
-    const pages = parseInt(input.value, 10);
-    if (pages) {
-        console.log('pages:', pages)
-        handleDownloadXls(pages)
-    }
+    const pages = parseInt(input.value, 10) || undefined;
+    handleDownloadXls(pages)
 }
 
 let open = false;
