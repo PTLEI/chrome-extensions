@@ -1,0 +1,23 @@
+.content-text {
+    --bg-size: 300%;
+    --color-one: aliceblue;
+    --color-two: lavenderblush;
+    font-size: clamp(3rem, 25vmin, 8rem);
+    background: linear-gradient(
+        90deg,
+        var(--color-one),
+        var(--color-two),
+        var(--color-one)
+      ) 0 0 / var(--bg-size) 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+
+    animation: move-bg 3s linear infinite;
+}
+
+@keyframes move-bg {
+    to {
+        background-position-x: var(--bg-size);
+    }
+}
