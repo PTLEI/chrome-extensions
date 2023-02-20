@@ -1,5 +1,20 @@
 console.log('content_script running');
 
+function getCellWidth(value) {
+    // 判断是否为null或undefined
+    if (value == null) {
+        return 10;
+    } else if (/.*[\u4e00-\u9fa5]+.*$/.test(value)) {
+        // 中文的长度
+        const chineseLength = value.match(/[\u4e00-\u9fa5]/g).length;
+        // 其他不是中文的长度
+        const otherLength = value.length - chineseLength;
+        return chineseLength * 2.1 + otherLength * 1.1;
+    } else {
+        return value.toString().length * 1.1;
+    }
+}
+
 async function handleDownloadXls(pages = 1, size = 30) {
     const maxPage = 10;
     const maxSize = 90;
@@ -8,7 +23,11 @@ async function handleDownloadXls(pages = 1, size = 30) {
 
     const requests = [];
     for (let i = 1; i <= totalPages; i++) {
-        requests.push(fetchList(i, loadSize))
+        requests.push(
+            fetchList({
+                page: i, size: loadSize
+            })
+        )
     }
 
     const list = await Promise.all(requests).then((datas) => {
@@ -17,11 +36,50 @@ async function handleDownloadXls(pages = 1, size = 30) {
 
     var wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(list);
+
+    let colWidths = [],
+        colNames = Object.keys(list[0]) // 所有列的名称数组
+
+    // 计算每一列的所有单元格宽度
+    // 先遍历行
+    list.forEach((row) => {
+        // 列序号
+        let index = 0
+        // 遍历列
+        for (const key in row) {
+            if (colWidths[index] == null) colWidths[index] = []
+
+            switch (typeof row[key]) {
+                case 'string':
+                case 'number':
+                case 'boolean':
+                    colWidths[index].push(getCellWidth(row[key]))
+                    break
+                case 'object':
+                case 'function':
+                    colWidths[index].push(0)
+                    break
+            }
+            index++
+        }
+    })
+
+    ws['!cols'] = []
+    // 每一列取最大值最为列宽
+    colWidths.forEach((widths, index) => {
+        // 计算列头的宽度
+        widths.push(getCellWidth(colNames[index]))
+        // 设置最大值为列宽
+        ws['!cols'].push({wch: Math.max(...widths)})
+    })
+
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
     XLSX.writeFile(wb, `表格_${new Date().valueOf()}.xlsx`);
 }
 
-const fetchList = async (page, size, date) => {
+const fetchList = async ({
+    page, size, date
+}) => {
     let dateString = date;
     if (!dateString) {
         const now = new Date();
