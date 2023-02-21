@@ -5,6 +5,11 @@
 	z-index: 999999;
 }
 
+#pageSize {
+    display: block;
+    width: 100%;
+}
+
 .download-extension-content {
     position: absolute;
     padding: 20px;

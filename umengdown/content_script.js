@@ -15,19 +15,27 @@ function getCellWidth(value) {
     }
 }
 
-async function handleDownloadXls(pages = 1, size = 30) {
+async function handleDownloadXls(startPage = 1, endPage = 2, size = 60) {
     const maxPage = 10;
     const maxSize = 90;
-    let totalPages = pages > maxPage ? maxPage : pages;
+    let sp = startPage;
+    let ep = endPage;
+    if (ep - sp > maxPage || sp >= ep) {
+        ep = sp + maxPage;
+    } else if (sp < 0 || ep < 0) {
+        return;
+    }
+    
     let loadSize = size > maxSize ? maxSize : size;
 
+    const downloadBtn = document.getElementById('down_report');
+    const searchParams = downloadBtn.getAttribute('searchcondition');
+    const dateString = downloadBtn.getAttribute('url').match(/&st=([^&]*)/)[1];
+
     const requests = [];
-    for (let i = 1; i <= totalPages; i++) {
-        requests.push(
-            fetchList({
-                page: i, size: loadSize
-            })
-        )
+    for (let page = sp; page <= ep; page++) {
+        const fetchUrl = `/main.php?c=eanalysis&a=edetail&ajax=module%3DgetList_currentPage%3D${page}_pageType%3D${loadSize}&siteid=1281203450&st=${dateString}&et=${dateString}` + searchParams;
+        requests.push(fetchList(fetchUrl))
     }
 
     const list = await Promise.all(requests).then((datas) => {
@@ -74,25 +82,17 @@ async function handleDownloadXls(pages = 1, size = 30) {
     })
 
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
-    XLSX.writeFile(wb, `表格_${new Date().valueOf()}.xlsx`);
+    XLSX.writeFile(wb, `事件明细数据_${dateString}_${sp}-${ep}页.xlsx`);
 }
 
-const fetchList = async ({
-    page, size, date
-}) => {
-    let dateString = date;
-    if (!dateString) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1;
-        const dateDay = now.getDate();
-        dateString = `${year}-${month > 9 ? month : '0' + month}-${dateDay > 9 ? dateDay : '0' + dateDay}`
-    }
-    const fetchUrl = `/main.php?c=eanalysis&a=edetail&ajax=module%3DgetList_currentPage%3D${page}_pageType%3D${size}&siteid=1281203450&st=${dateString}&et=${dateString}&visitorType=&location=&ip=&referer=&cnzz_eid=&eventname=`;
+const fetchList = async (fetchUrl) => {
     const list = await fetch(fetchUrl, {method: 'GET'})
         .then(async (response) => {
             const {data} = await response.json();
-            return data.getList.items;
+            if (data.getList && data.getList.items) {
+                return data.getList.items;
+            }
+            return [];
         })
     return list;
 }
@@ -112,8 +112,17 @@ const renderContent = document.createElement('div')
 renderContent.className = 'download-extension-content'
 renderContent.insertAdjacentHTML('afterbegin', `
     <div id="control-row">
-        <label class="page-label" for="extensionInput">Pages:</label>
+        <p>默认前两页，页数60</p>
+        <label class="page-label" for="extensionInput">开始页:</label>
         <input type="text" id="extensionInput">
+        <label class="page-label" for="endPage">结束页:</label>
+        <input type="text" id="endPage">
+        <label class="page-label" for="pageSize">页数:</label>
+        <select id="pageSize">
+            <option value="30">30</option>
+            <option value="60" selected>60</option>
+            <option value="90">90</option>
+        </select>
         <br>
         <button id="extensionDownload">Download</button>
     </div>
@@ -122,8 +131,12 @@ renderContent.insertAdjacentHTML('afterbegin', `
 function handleExtensionDownload(event) {
     event.preventDefault();
     const input = document.getElementById('extensionInput');
-    const pages = parseInt(input.value, 10) || undefined;
-    handleDownloadXls(pages)
+    const endInput = document.getElementById('endPage');
+    const pagesize = document.getElementById('pageSize');
+    const sp = parseInt(input.value, 10) || undefined;
+    const ep = parseInt(endInput.value, 10) || undefined;
+    const ps = parseInt(pagesize.value, 10) || undefined;
+    handleDownloadXls(sp, ep, ps)
 }
 
 let open = false;
